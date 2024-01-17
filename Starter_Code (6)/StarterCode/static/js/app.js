@@ -1,131 +1,142 @@
-//assigning url to variable
-let url = "https://2u-data-curriculum-team.s3.amazonaws.com/dataviz-classroom/v1.1/14-Interactive-Web-Visualizations/02-Homework/samples.json"
+//read json from URL
+let url = "https://2u-data-curriculum-team.s3.amazonaws.com/dataviz-classroom/v1.1/14-Interactive-Web-Visualizations/02-Homework/samples.json";
 
-//using d3 to read the data in json
-d3.json(url).then(function(data) {
-    console.log(data);
+//find the selector
+let selector = d3.select('select');
+
+//find metadata chart
+let metadataChart = d3.select('.panel-body');
+
+//find bar
+let bar = d3.select('#bar');
+
+//find bubble
+let bubble = d3.select('#bubble');
+
+//initialize variables
+let ids = [];
+let otuIds = [];
+let otuLabels = [];
+let sampleValues = [];
+let metaData = [];
+
+
+function init(json) {
+    let data = json.samples;
+    metaData = json.metadata;
+    let defaultKey = 0;
+
+    //add values to initialized arrays
+    ids = getID(data);
+    otuIds = getOtuIDs(data);
+    otuLabels = getOtuLabels(data);
+    sampleValues = getSampleValues(data);
+
+    //add ids to the selector
+    ids.map((label) => {selector.append('option').text(label)});
+
+    //initialize charts and metadata
+    plotBar(defaultKey, otuIds, otuLabels, sampleValues, false);
+    plotBubble(defaultKey, otuIds, otuLabels, sampleValues, false);
+    metadataChart.append('metadata').text(createMetadata(metaData[defaultKey]));
+    
+};
+
+//initialize dashboard
+d3.json(url).then(init);
+
+//update charts and metadata on selector change
+selector.on('change', function() {
+    let s = d3.select(this);
+    let newId = s.property("value");
+    let newIndex = ids.findIndex((val) => val === newId);
+    plotBubble(newIndex, otuIds, otuLabels, sampleValues, true);
+    plotBar(newIndex, otuIds, otuLabels, sampleValues, true);
+    updateMetadata(metaData[newIndex]);
 });
 
-//initialzing dashboard
-function init(){
-    //drop down selection
-    let dropdown = d3.select("#selDataset");
-    //accessing data using d3
-    d3.json(url).then((data) => {
-        let sample_ids = data.names;
-        console.log(sample_ids);
-        for (id of sample_ids){
-            dropdown.append("option").attr("value", id).text(id);
-        };
-    //store the first sample for display
-    let first_entry = sample_ids[0];
-    console.log(first_entry);
-    makeBar(first_entry);
-    makeBubble(first_entry);
-    makeDemographics(first_entry);
-    }); //end of d3 access
-};
-//create a function to populate the horizontal bar chart graph
-function makeBar(sample){
-
-    //access the sample data for populating the bar chart
-    d3.json(url).then((data) => {
-        let sample_data = data.samples;
-        //apply a filter that matches based on sample id
-        let results = sample_data.filter(id => id.id == sample);
-        //access and store the first entry in results filter
-        let first_result = results[0];
-        console.log(first_result);
-        //store the first 10 results to display in the bar chart
-        let sample_values = first_result.sample_values.slice(0,10);
-        let otu_ids = first_result.otu_ids.slice(0,10);
-        let otu_labels = first_result.otu_labels.slice(0,10);
-        console.log(sample_values);
-        console.log(otu_ids);
-        console.log(otu_labels);
-
-        //create the trace for bar chart
-        let bar_trace = {
-            x: sample_values.reverse(),
-            y: otu_ids.map(item => `OTU ${item}`).reverse(),
-            text: otu_labels.reverse(),
-            type: 'bar',
-            orientation: 'h'
-        };
-
-        let layout = {title: "Top Ten OTUs"};
-        Plotly.newPlot("bar", [bar_trace], layout);
-    });
+function getID(json) {
+    let idArray = json.map((value) => value.id);
+    return idArray
 };
 
-function makeBubble(sample){
-    //access the sample data for populating the bubble chart
-    d3.json(url).then((data) => {
-        let sample_data = data.samples;
-        //apply a filter that matches based on sample id
-        let results = sample_data.filter(id => id.id == sample);
-        //access and store the first entry in results filter
-        let first_result = results[0];
-        console.log(first_result);
-        //store the results to display in the bubble chart
-        let sample_values = first_result.sample_values;
-        let otu_ids = first_result.otu_ids;
-        let otu_labels = first_result.otu_labels;
-        console.log(sample_values);
-        console.log(otu_ids);
-        console.log(otu_labels);
-
-        //create the trace for bubble chart
-        let bubble_trace = {
-            x: otu_ids.reverse(),
-            y: sample_values.reverse(),
-            text: otu_labels.reverse(),
-            mode: 'markers',
-            marker: {
-                size: sample_values,
-                color: otu_ids,
-            }
-        };
-
-        let layout = {
-            title: "Bacteria Count for each Sample ID",
-            xaxis: {title: 'OTU ID'},
-            yaxis: {title: 'Number of Bacteria'}
-        };
-        Plotly.newPlot("bubble", [bubble_trace], layout); //'bubble' is the html tag in index.html
-    });
+function getOtuIDs(json) {
+    let otuIDArray = json.map((value) => value.otu_ids);
+    return otuIDArray
 };
 
-//create the demographic info function to populate each sample's info
-function makeDemographics(sample){
-    //access the sample data for populating the demographics section
-    d3.json(url).then((data) => {
-    //access the demographic info (metadata) with d3
-    let demographic_info = data.metadata;
-     //apply a filter that matches based on sample id
-    let results = demographic_info.filter(id => id.id == sample);
-    //store the first result to display in demographic info
-    let first_result = results[0];
-    console.log(first_result);
-    //this is used to clear out previous entries in the demographic info section by setting the text to a blank string
-    d3.select('#sample-metadata').text('');
-
-    Object.entries(first_result).forEach(([key,value]) => {
-        console.log(key,value);
-        //select the demographic info html section with d3 and append new key-value pair
-        d3.select('#sample-metadata').append('h3').text(`${key}, ${value}`);
-    });
-    
-    });
+function getOtuLabels(json) {
+    let otuLabelArray = json.map((value) => value.otu_labels);
+    return otuLabelArray
 };
 
-// //define the function when the dropdown detects a change (function name as defined in index.html)
-function optionChanged(value){
-    //log the value for debug
-    console.log(value);
-    makeBar(value);
-    makeBubble(value);
-    makeDemographics(value);
+function getSampleValues(json) {
+    let sampleValueArray = json.map((value) => value.sample_values);
+    return sampleValueArray
 };
 
-init();
+function createMetadata(metadata) {
+    metadataChart.append('id').text(`id: ${metadata.id}`).attr('style', 'font-size: 10px').append('div');
+    metadataChart.append('ethnicity').text(`ethnicity: ${metadata.ethnicity}`).attr('style', 'font-size: 10px').append('div');
+    metadataChart.append('gender').text(`gender: ${metadata.gender}`).attr('style', 'font-size: 10px').append('div');
+    metadataChart.append('age').text(`age: ${metadata.age}`).attr('style', 'font-size: 10px').append('div');
+    metadataChart.append('location').text(`location: ${metadata.location}`).attr('style', 'font-size: 10px').append('div');
+    metadataChart.append('bbtype').text(`bbtype: ${metadata.bbtype}`).attr('style', 'font-size: 10px').append('div');
+    metadataChart.append('wfreq').text(`wfreq: ${metadata.wfreq}`).attr('style', 'font-size: 10px');
+}
+
+function updateMetadata(metadata) {
+    d3.select('id').text(`id: ${metadata.id}`).attr('style', 'font-size: 10px').append('div');
+    d3.select('ethnicity').text(`ethnicity: ${metadata.ethnicity}`).attr('style', 'font-size: 10px').append('div');
+    d3.select('gender').text(`gender: ${metadata.gender}`).attr('style', 'font-size: 10px').append('div');
+    d3.select('age').text(`age: ${metadata.age}`).attr('style', 'font-size: 10px').append('div');
+    d3.select('location').text(`location: ${metadata.location}`).attr('style', 'font-size: 10px').append('div');
+    d3.select('bbtype').text(`bbtype: ${metadata.bbtype}`).attr('style', 'font-size: 10px').append('div');
+    d3.select('wfreq').text(`wfreq: ${metadata.wfreq}`).attr('style', 'font-size: 10px');
+}
+
+function createBarTrace(idIndexVal, otuIdsArray, otuLabelsArray, sampleValuesArray) {
+    let sampleValuesToPlot = sampleValuesArray[idIndexVal].slice(0, 10).reverse();
+    let otuIdsToPlot = otuIdsArray[idIndexVal].map(otuId => `OTU ${otuId}`).slice(0, 10).reverse();
+    let otuLabelsToPlot = otuLabelsArray[idIndexVal].slice(0, 10).reverse();
+    trace1 = {
+        x: sampleValuesToPlot,
+        y: otuIdsToPlot,
+        type: 'bar',
+        orientation: 'h',
+        hovertext: otuLabelsToPlot
+    }
+    return trace1;
+}
+
+function plotBar(idIndexVal, otuIdsArray, otuLabelsArray, sampleValuesArray, restyle) {;
+    trace = createBarTrace(idIndexVal, otuIdsArray, otuLabelsArray, sampleValuesArray);
+    data = [trace];
+    Plotly.newPlot(bar.node(), data);
+}
+
+function createBubbleTrace(idIndexVal, otuIdsArray, otuLabelsArray, sampleValuesArray){
+    let sampleValuesToPlot = sampleValuesArray[idIndexVal];
+    let otuIdsToPlot = otuIdsArray[idIndexVal];
+    let otuLabelsToPlot = otuLabelsArray[idIndexVal];
+    //bubble chart trace
+    //https://plotly.com/javascript/bubble-charts/
+    trace1 = {
+        x: otuIdsToPlot,
+        y: sampleValuesToPlot,
+        mode: 'markers',
+        marker: {
+            size: sampleValuesToPlot,
+            color: otuIdsToPlot
+        },
+        text: otuLabelsToPlot,
+        type:'scatter'
+    }
+    return trace1;
+}
+
+function plotBubble(idIndexVal, otuIdsArray, otuLabelsArray, sampleValuesArray, restyle) {
+    trace = createBubbleTrace(idIndexVal, otuIdsArray, otuLabelsArray, sampleValuesArray);
+    data = [trace];
+    Plotly.newPlot(bubble.node(), data);
+}
